@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -93,8 +94,7 @@ namespace Jellyfin.Server
 
         private static async Task StartApp(StartupOptions options)
         {
-            var stopWatch = new Stopwatch();
-            stopWatch.Start();
+            var startTimestamp = Stopwatch.GetTimestamp();
 
             // Log all uncaught exceptions to std error
             static void UnhandledExceptionToConsole(object sender, UnhandledExceptionEventArgs e) =>
@@ -201,7 +201,7 @@ namespace Jellyfin.Server
                 {
                     await webHost.StartAsync(_tokenSource.Token).ConfigureAwait(false);
 
-                    if (startupConfig.UseUnixSocket() && Environment.OSVersion.Platform == PlatformID.Unix)
+                    if (!OperatingSystem.IsWindows() && startupConfig.UseUnixSocket())
                     {
                         var socketPath = GetUnixSocketPath(startupConfig, appPaths);
 
@@ -216,9 +216,7 @@ namespace Jellyfin.Server
 
                 await appHost.RunStartupTasksAsync(_tokenSource.Token).ConfigureAwait(false);
 
-                stopWatch.Stop();
-
-                _logger.LogInformation("Startup complete {Time:g}", stopWatch.Elapsed);
+                _logger.LogInformation("Startup complete {Time:g}", Stopwatch.GetElapsedTime(startTimestamp));
 
                 // Block main thread until shutdown
                 await Task.Delay(-1, _tokenSource.Token).ConfigureAwait(false);
@@ -234,7 +232,7 @@ namespace Jellyfin.Server
             finally
             {
                 // Don't throw additional exception if startup failed.
-                if (appHost.ServiceProvider != null)
+                if (appHost.ServiceProvider is not null)
                 {
                     _logger.LogInformation("Running query planner optimizations in the database... This might take a while");
                     // Run before disposing the application
@@ -407,7 +405,7 @@ namespace Jellyfin.Server
 
                 if (string.IsNullOrEmpty(configDir))
                 {
-                    if (options.DataDir != null
+                    if (options.DataDir is not null
                         || Directory.Exists(Path.Combine(dataDir, "config"))
                         || OperatingSystem.IsWindows())
                     {
@@ -582,7 +580,7 @@ namespace Jellyfin.Server
         {
             // Use the swagger API page as the default redirect path if not hosting the web client
             var inMemoryDefaultConfig = ConfigurationOptions.DefaultConfiguration;
-            if (startupConfig != null && !startupConfig.HostWebClient())
+            if (startupConfig is not null && !startupConfig.HostWebClient())
             {
                 inMemoryDefaultConfig[DefaultRedirectKey] = "api-docs/swagger";
             }
@@ -642,7 +640,7 @@ namespace Jellyfin.Server
             }
 
             string commandLineArgsString;
-            if (options.RestartArgs != null)
+            if (options.RestartArgs is not null)
             {
                 commandLineArgsString = options.RestartArgs;
             }
@@ -677,7 +675,7 @@ namespace Jellyfin.Server
             {
                 var xdgRuntimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
                 var socketFile = "jellyfin.sock";
-                if (xdgRuntimeDir == null)
+                if (xdgRuntimeDir is null)
                 {
                     // Fall back to config dir
                     socketPath = Path.Join(appPaths.ConfigurationDirectoryPath, socketFile);
@@ -691,27 +689,15 @@ namespace Jellyfin.Server
             return socketPath;
         }
 
+        [UnsupportedOSPlatform("windows")]
         private static void SetUnixSocketPermissions(IConfiguration startupConfig, string socketPath)
         {
             var socketPerms = startupConfig.GetUnixSocketPermissions();
 
             if (!string.IsNullOrEmpty(socketPerms))
             {
-                #pragma warning disable SA1300 // Entrypoint is case sensitive.
-                [DllImport("libc")]
-                static extern int chmod(string pathname, int mode);
-                #pragma warning restore SA1300
-
-                var exitCode = chmod(socketPath, Convert.ToInt32(socketPerms, 8));
-
-                if (exitCode < 0)
-                {
-                    _logger.LogError("Failed to set Kestrel unix socket permissions to {SocketPerms}, return code: {ExitCode}", socketPerms, exitCode);
-                }
-                else
-                {
-                    _logger.LogInformation("Kestrel unix socket permissions set to {SocketPerms}", socketPerms);
-                }
+                File.SetUnixFileMode(socketPath, (UnixFileMode)Convert.ToInt32(socketPerms, 8));
+                _logger.LogInformation("Kestrel unix socket permissions set to {SocketPerms}", socketPerms);
             }
         }
     }

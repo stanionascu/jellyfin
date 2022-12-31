@@ -92,25 +92,25 @@ namespace Jellyfin.Api.Controllers
                 Years = itemList.Select(i => i.ProductionYear ?? -1)
                     .Where(i => i > 0)
                     .Distinct()
-                    .OrderBy(i => i)
+                    .Order()
                     .ToArray(),
 
                 Genres = itemList.SelectMany(i => i.Genres)
                     .DistinctNames()
-                    .OrderBy(i => i)
+                    .Order()
                     .ToArray(),
 
                 Tags = itemList
                     .SelectMany(i => i.Tags)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(i => i)
+                    .Order()
                     .ToArray(),
 
                 OfficialRatings = itemList
                     .Select(i => i.OfficialRating)
                     .Where(i => !string.IsNullOrWhiteSpace(i))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(i => i)
+                    .Order()
                     .ToArray()
             };
         }
@@ -182,7 +182,7 @@ namespace Jellyfin.Api.Controllers
 
             if ((recursive ?? true) || parentItem is UserView || parentItem is ICollectionFolder)
             {
-                genreQuery.AncestorIds = parentItem == null ? Array.Empty<Guid>() : new[] { parentItem.Id };
+                genreQuery.AncestorIds = parentItem is null ? Array.Empty<Guid>() : new[] { parentItem.Id };
             }
             else
             {

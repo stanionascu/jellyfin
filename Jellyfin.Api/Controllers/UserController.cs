@@ -124,7 +124,7 @@ namespace Jellyfin.Api.Controllers
         {
             var user = _userManager.GetUserById(userId);
 
-            if (user == null)
+            if (user is null)
             {
                 return NotFound("User not found");
             }
@@ -157,7 +157,6 @@ namespace Jellyfin.Api.Controllers
         /// </summary>
         /// <param name="userId">The user id.</param>
         /// <param name="pw">The password as plain text.</param>
-        /// <param name="password">The password sha1-hash.</param>
         /// <response code="200">User authenticated.</response>
         /// <response code="403">Sha1-hashed password only is not allowed.</response>
         /// <response code="404">User not found.</response>
@@ -166,21 +165,16 @@ namespace Jellyfin.Api.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [Obsolete("Authenticate with username instead")]
         public async Task<ActionResult<AuthenticationResult>> AuthenticateUser(
             [FromRoute, Required] Guid userId,
-            [FromQuery, Required] string pw,
-            [FromQuery] string? password)
+            [FromQuery, Required] string pw)
         {
             var user = _userManager.GetUserById(userId);
 
-            if (user == null)
+            if (user is null)
             {
                 return NotFound("User not found");
-            }
-
-            if (!string.IsNullOrEmpty(password) && string.IsNullOrEmpty(pw))
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, "Only sha1 password is not allowed.");
             }
 
             AuthenticateUserByName request = new AuthenticateUserByName
@@ -272,7 +266,7 @@ namespace Jellyfin.Api.Controllers
 
             var user = _userManager.GetUserById(userId);
 
-            if (user == null)
+            if (user is null)
             {
                 return NotFound("User not found");
             }
@@ -292,7 +286,7 @@ namespace Jellyfin.Api.Controllers
                         HttpContext.GetNormalizedRemoteIp().ToString(),
                         false).ConfigureAwait(false);
 
-                    if (success == null)
+                    if (success is null)
                     {
                         return StatusCode(StatusCodes.Status403Forbidden, "Invalid user or password entered.");
                     }
@@ -333,7 +327,7 @@ namespace Jellyfin.Api.Controllers
 
             var user = _userManager.GetUserById(userId);
 
-            if (user == null)
+            if (user is null)
             {
                 return NotFound("User not found");
             }
@@ -477,7 +471,7 @@ namespace Jellyfin.Api.Controllers
             var newUser = await _userManager.CreateUserAsync(request.Name).ConfigureAwait(false);
 
             // no need to authenticate password for new user
-            if (request.Password != null)
+            if (request.Password is not null)
             {
                 await _userManager.ChangePassword(newUser, request.Password).ConfigureAwait(false);
             }
@@ -544,7 +538,7 @@ namespace Jellyfin.Api.Controllers
             }
 
             var user = _userManager.GetUserById(userId);
-            if (user == null)
+            if (user is null)
             {
                 return BadRequest();
             }

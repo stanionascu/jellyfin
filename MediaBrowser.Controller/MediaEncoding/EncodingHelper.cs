@@ -162,7 +162,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         private bool IsHwTonemapAvailable(EncodingJobInfo state, EncodingOptions options)
         {
-            if (state.VideoStream == null
+            if (state.VideoStream is null
                 || !options.EnableTonemapping
                 || GetVideoColorBitDepth(state) != 10)
             {
@@ -189,7 +189,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         private bool IsVulkanHwTonemapAvailable(EncodingJobInfo state, EncodingOptions options)
         {
-            if (state.VideoStream == null)
+            if (state.VideoStream is null)
             {
                 return false;
             }
@@ -202,7 +202,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         private bool IsVaapiVppTonemapAvailable(EncodingJobInfo state, EncodingOptions options)
         {
-            if (state.VideoStream == null
+            if (state.VideoStream is null
                 || !options.EnableVppTonemapping
                 || GetVideoColorBitDepth(state) != 10)
             {
@@ -682,7 +682,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         public string GetGraphicalSubCanvasSize(EncodingJobInfo state)
         {
-            if (state.SubtitleStream != null
+            if (state.SubtitleStream is not null
                 && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode
                 && !state.SubtitleStream.IsTextSubtitleStream)
             {
@@ -932,14 +932,16 @@ namespace MediaBrowser.Controller.MediaEncoding
                 .Append(GetInputPathArgument(state));
 
             // sub2video for external graphical subtitles
-            if (state.SubtitleStream != null
+            if (state.SubtitleStream is not null
                 && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode
                 && !state.SubtitleStream.IsTextSubtitleStream
                 && state.SubtitleStream.IsExternal)
             {
                 var subtitlePath = state.SubtitleStream.Path;
+                var subtitleExtension = Path.GetExtension(subtitlePath);
 
-                if (string.Equals(Path.GetExtension(subtitlePath), ".sub", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(subtitleExtension, ".sub", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(subtitleExtension, ".sup", StringComparison.OrdinalIgnoreCase))
                 {
                     var idxFile = Path.ChangeExtension(subtitlePath, ".idx");
                     if (File.Exists(idxFile))
@@ -963,7 +965,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                 arg.Append(" -i file:\"").Append(subtitlePath).Append('\"');
             }
 
-            if (state.AudioStream != null && state.AudioStream.IsExternal)
+            if (state.AudioStream is not null && state.AudioStream.IsExternal)
             {
                 // Also seek the external audio stream.
                 var seekAudioParam = GetFastSeekCommandLineParameter(state, options, segmentContainer);
@@ -977,7 +979,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             // Disable auto inserted SW scaler for HW decoders in case of changed resolution.
             var isSwDecoder = string.IsNullOrEmpty(GetHardwareVideoDecoder(state, options));
-            if (!isSwDecoder)
+            if (!isSwDecoder && _mediaEncoder.EncoderVersion >= new Version(4, 4))
             {
                 arg.Append(" -autoscale 0");
             }
@@ -1066,7 +1068,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         public string GetVideoBitrateParam(EncodingJobInfo state, string videoCodec)
         {
-            if (state.OutputVideoBitrate == null)
+            if (state.OutputVideoBitrate is null)
             {
                 return string.Empty;
             }
@@ -1231,7 +1233,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             var maxrate = request.MaxFramerate;
 
-            if (maxrate.HasValue && state.VideoStream != null)
+            if (maxrate.HasValue && state.VideoStream is not null)
             {
                 var contentRate = state.VideoStream.AverageFrameRate ?? state.VideoStream.RealFrameRate;
 
@@ -1981,7 +1983,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         {
             var bitrate = request.VideoBitRate;
 
-            if (videoStream != null)
+            if (videoStream is not null)
             {
                 var isUpscaling = request.Height.HasValue
                     && videoStream.Height.HasValue
@@ -2076,7 +2078,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         public int? GetAudioBitrateParam(int? audioBitRate, string audioCodec, MediaStream audioStream)
         {
-            if (audioStream == null)
+            if (audioStream is null)
             {
                 return null;
             }
@@ -2130,7 +2132,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             // Boost volume to 200% when downsampling from 6ch to 2ch
             if (channels.HasValue
                 && channels.Value <= 2
-                && state.AudioStream != null
+                && state.AudioStream is not null
                 && state.AudioStream.Channels.HasValue
                 && state.AudioStream.Channels.Value > 5
                 && !encodingOptions.DownMixAudioBoost.Equals(1))
@@ -2139,7 +2141,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             }
 
             var isCopyingTimestamps = state.CopyTimestamps || state.TranscodingType != TranscodingJobType.Progressive;
-            if (state.SubtitleStream != null && state.SubtitleStream.IsTextSubtitleStream && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode && !isCopyingTimestamps)
+            if (state.SubtitleStream is not null && state.SubtitleStream.IsTextSubtitleStream && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode && !isCopyingTimestamps)
             {
                 var seconds = TimeSpan.FromTicks(state.StartTimeTicks ?? 0).TotalSeconds;
 
@@ -2167,7 +2169,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         /// <returns>System.Nullable{System.Int32}.</returns>
         public int? GetNumAudioChannelsParam(EncodingJobInfo state, MediaStream audioStream, string outputAudioCodec)
         {
-            if (audioStream == null)
+            if (audioStream is null)
             {
                 return null;
             }
@@ -2320,26 +2322,26 @@ namespace MediaBrowser.Controller.MediaEncoding
             // If we don't have known media info
             // If input is video, use -sn to drop subtitles
             // Otherwise just return empty
-            if (state.VideoStream == null && state.AudioStream == null)
+            if (state.VideoStream is null && state.AudioStream is null)
             {
                 return state.IsInputVideo ? "-sn" : string.Empty;
             }
 
             // We have media info, but we don't know the stream index
-            if (state.VideoStream != null && state.VideoStream.Index == -1)
+            if (state.VideoStream is not null && state.VideoStream.Index == -1)
             {
                 return "-sn";
             }
 
             // We have media info, but we don't know the stream index
-            if (state.AudioStream != null && state.AudioStream.Index == -1)
+            if (state.AudioStream is not null && state.AudioStream.Index == -1)
             {
                 return state.IsInputVideo ? "-sn" : string.Empty;
             }
 
             var args = string.Empty;
 
-            if (state.VideoStream != null)
+            if (state.VideoStream is not null)
             {
                 int videoStreamIndex = FindIndex(state.MediaSource.MediaStreams, state.VideoStream);
 
@@ -2354,12 +2356,12 @@ namespace MediaBrowser.Controller.MediaEncoding
                 args += "-vn";
             }
 
-            if (state.AudioStream != null)
+            if (state.AudioStream is not null)
             {
                 int audioStreamIndex = FindIndex(state.MediaSource.MediaStreams, state.AudioStream);
                 if (state.AudioStream.IsExternal)
                 {
-                    bool hasExternalGraphicsSubs = state.SubtitleStream != null
+                    bool hasExternalGraphicsSubs = state.SubtitleStream is not null
                         && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode
                         && state.SubtitleStream.IsExternal
                         && !state.SubtitleStream.IsTextSubtitleStream;
@@ -2385,7 +2387,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             }
 
             var subtitleMethod = state.SubtitleDeliveryMethod;
-            if (state.SubtitleStream == null || subtitleMethod == SubtitleDeliveryMethod.Hls)
+            if (state.SubtitleStream is null || subtitleMethod == SubtitleDeliveryMethod.Hls)
             {
                 args += " -map -0:s";
             }
@@ -2427,7 +2429,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             {
                 var stream = streams.FirstOrDefault(s => s.Index == desiredIndex.Value);
 
-                if (stream != null)
+                if (stream is not null)
                 {
                     return stream;
                 }
@@ -2731,7 +2733,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             }
 
             // default
-            if (filter == null)
+            if (filter is null)
             {
                 if (requestedHeight > 0)
                 {
@@ -2814,7 +2816,6 @@ namespace MediaBrowser.Controller.MediaEncoding
                 {
                     algorithm = "bt.2390";
                 }
-
                 else if (string.Equals(options.TonemappingAlgorithm, "none", StringComparison.OrdinalIgnoreCase))
                 {
                     algorithm = "clip";
@@ -2876,7 +2877,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doDeintHevc = state.DeInterlace("h265", true) || state.DeInterlace("hevc", true);
             var doDeintH2645 = doDeintH264 || doDeintHevc;
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
 
@@ -2991,7 +2992,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doDeintH2645 = doDeintH264 || doDeintHevc;
             var doCuTonemap = IsHwTonemapAvailable(state, options);
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -3181,7 +3182,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doDeintH2645 = doDeintH264 || doDeintHevc;
             var doOclTonemap = IsHwTonemapAvailable(state, options);
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -3403,7 +3404,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doDeintH2645 = doDeintH264 || doDeintHevc;
             var doOclTonemap = IsHwTonemapAvailable(state, options);
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -3606,7 +3607,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doTonemap = doVaVppTonemap || doOclTonemap;
             var doDeintH2645 = doDeintH264 || doDeintHevc;
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -3883,7 +3884,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doTonemap = doVaVppTonemap || doOclTonemap;
             var doDeintH2645 = doDeintH264 || doDeintHevc;
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -4079,7 +4080,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doVkTonemap = IsVulkanHwTonemapAvailable(state, options);
             var doDeintH2645 = doDeintH264 || doDeintHevc;
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
             var hasAssSubs = hasSubs
@@ -4278,7 +4279,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var doDeintH2645 = doDeintH264 || doDeintHevc;
             var doOclTonemap = IsHwTonemapAvailable(state, options);
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
 
@@ -4441,12 +4442,12 @@ namespace MediaBrowser.Controller.MediaEncoding
             string outputVideoCodec)
         {
             var videoStream = state.VideoStream;
-            if (videoStream == null)
+            if (videoStream is null)
             {
                 return string.Empty;
             }
 
-            var hasSubs = state.SubtitleStream != null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+            var hasSubs = state.SubtitleStream is not null && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
             var hasTextSubs = hasSubs && state.SubtitleStream.IsTextSubtitleStream;
             var hasGraphicalSubs = hasSubs && !state.SubtitleStream.IsTextSubtitleStream;
 
@@ -4496,7 +4497,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             if (overlayFilters?.Count > 0
                 && subFilters?.Count > 0
-                && state.SubtitleStream != null)
+                && state.SubtitleStream is not null)
             {
                 // overlay graphical/text subtitles
                 var subStr = string.Format(
@@ -4583,7 +4584,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         public static int GetVideoColorBitDepth(EncodingJobInfo state)
         {
             var videoStream = state.VideoStream;
-            if (videoStream != null)
+            if (videoStream is not null)
             {
                 if (videoStream.BitDepth.HasValue)
                 {
@@ -4624,7 +4625,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         {
             var videoStream = state.VideoStream;
             var mediaSource = state.MediaSource;
-            if (videoStream == null || mediaSource == null)
+            if (videoStream is null || mediaSource is null)
             {
                 return null;
             }
@@ -5197,7 +5198,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 #nullable disable
         public void TryStreamCopy(EncodingJobInfo state)
         {
-            if (state.VideoStream != null && CanStreamCopyVideo(state, state.VideoStream))
+            if (state.VideoStream is not null && CanStreamCopyVideo(state, state.VideoStream))
             {
                 state.OutputVideoCodec = "copy";
             }
@@ -5206,13 +5207,13 @@ namespace MediaBrowser.Controller.MediaEncoding
                 var user = state.User;
 
                 // If the user doesn't have access to transcoding, then force stream copy, regardless of whether it will be compatible or not
-                if (user != null && !user.HasPermission(PermissionKind.EnableVideoPlaybackTranscoding))
+                if (user is not null && !user.HasPermission(PermissionKind.EnableVideoPlaybackTranscoding))
                 {
                     state.OutputVideoCodec = "copy";
                 }
             }
 
-            if (state.AudioStream != null
+            if (state.AudioStream is not null
                 && CanStreamCopyAudio(state, state.AudioStream, state.SupportedAudioCodecs))
             {
                 state.OutputAudioCodec = "copy";
@@ -5222,7 +5223,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                 var user = state.User;
 
                 // If the user doesn't have access to transcoding, then force stream copy, regardless of whether it will be compatible or not
-                if (user != null && !user.HasPermission(PermissionKind.EnableAudioPlaybackTranscoding))
+                if (user is not null && !user.HasPermission(PermissionKind.EnableAudioPlaybackTranscoding))
                 {
                     state.OutputAudioCodec = "copy";
                 }
@@ -5419,7 +5420,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                 state.SubtitleDeliveryMethod = videoRequest.SubtitleMethod;
                 state.AudioStream = GetMediaStream(mediaStreams, videoRequest.AudioStreamIndex, MediaStreamType.Audio);
 
-                if (state.SubtitleStream != null && !state.SubtitleStream.IsExternal)
+                if (state.SubtitleStream is not null && !state.SubtitleStream.IsExternal)
                 {
                     state.InternalSubtitleStreamOffset = mediaStreams.Where(i => i.Type == MediaStreamType.Subtitle && !i.IsExternal).ToList().IndexOf(state.SubtitleStream);
                 }
@@ -5437,7 +5438,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             var request = state.BaseRequest;
             var supportedAudioCodecs = state.SupportedAudioCodecs;
-            if (request != null && supportedAudioCodecs != null && supportedAudioCodecs.Length > 0)
+            if (request is not null && supportedAudioCodecs is not null && supportedAudioCodecs.Length > 0)
             {
                 var supportedAudioCodecsList = supportedAudioCodecs.ToList();
 
@@ -5450,7 +5451,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             }
 
             var supportedVideoCodecs = state.SupportedVideoCodecs;
-            if (request != null && supportedVideoCodecs != null && supportedVideoCodecs.Length > 0)
+            if (request is not null && supportedVideoCodecs is not null && supportedVideoCodecs.Length > 0)
             {
                 var supportedVideoCodecsList = supportedVideoCodecs.ToList();
 
@@ -5470,7 +5471,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                 return;
             }
 
-            var inputChannels = audioStream == null ? 6 : audioStream.Channels ?? 6;
+            var inputChannels = audioStream is null ? 6 : audioStream.Channels ?? 6;
             if (inputChannels >= 6)
             {
                 return;
@@ -5522,7 +5523,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         private void NormalizeSubtitleEmbed(EncodingJobInfo state)
         {
-            if (state.SubtitleStream == null || state.SubtitleDeliveryMethod != SubtitleDeliveryMethod.Embed)
+            if (state.SubtitleStream is null || state.SubtitleDeliveryMethod != SubtitleDeliveryMethod.Embed)
             {
                 return;
             }
@@ -5537,7 +5538,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         public string GetSubtitleEmbedArguments(EncodingJobInfo state)
         {
-            if (state.SubtitleStream == null || state.SubtitleDeliveryMethod != SubtitleDeliveryMethod.Embed)
+            if (state.SubtitleStream is null || state.SubtitleDeliveryMethod != SubtitleDeliveryMethod.Embed)
             {
                 return string.Empty;
             }
@@ -5569,7 +5570,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                 && state.BaseRequest.Context == EncodingContext.Streaming)
             {
                 // Comparison: https://github.com/jansmolders86/mediacenterjs/blob/master/lib/transcoding/desktop.js
-                format = " -f mp4 -movflags frag_keyframe+empty_moov";
+                format = " -f mp4 -movflags frag_keyframe+empty_moov+delay_moov";
             }
 
             var threads = GetNumberOfThreads(state, encodingOptions, videoCodec);
@@ -5618,7 +5619,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             if (IsCopyCodec(videoCodec))
             {
-                if (state.VideoStream != null
+                if (state.VideoStream is not null
                     && string.Equals(state.OutputContainer, "ts", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(state.VideoStream.NalLengthSize, "0", StringComparison.OrdinalIgnoreCase))
                 {
@@ -5648,7 +5649,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
                 args += keyFrameArg;
 
-                var hasGraphicalSubs = state.SubtitleStream != null && !state.SubtitleStream.IsTextSubtitleStream && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
+                var hasGraphicalSubs = state.SubtitleStream is not null && !state.SubtitleStream.IsTextSubtitleStream && state.SubtitleDeliveryMethod == SubtitleDeliveryMethod.Encode;
 
                 var hasCopyTs = false;
 
@@ -5668,7 +5669,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
                     args += " -avoid_negative_ts disabled";
 
-                    if (!(state.SubtitleStream != null && state.SubtitleStream.IsExternal && !state.SubtitleStream.IsTextSubtitleStream))
+                    if (!(state.SubtitleStream is not null && state.SubtitleStream.IsExternal && !state.SubtitleStream.IsTextSubtitleStream))
                     {
                         args += " -start_at_zero";
                     }
@@ -5695,7 +5696,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         public string GetProgressiveVideoAudioArguments(EncodingJobInfo state, EncodingOptions encodingOptions)
         {
             // If the video doesn't have an audio stream, return a default.
-            if (state.AudioStream == null && state.VideoStream != null)
+            if (state.AudioStream is null && state.VideoStream is not null)
             {
                 return string.Empty;
             }
